@@ -240,7 +240,8 @@ public class GCInspector implements NotificationListener, GCInspectorMXBean
                 long previousTotal = gcState.lastGcTotalDuration;
                 long total = gcState.gcBean.getCollectionTime();
                 gcState.lastGcTotalDuration = total;
-                duration = total - previousTotal; // may be zero for a really fast collection
+                long possibleDuration = total - previousTotal; // may be zero for a really fast collection
+                duration = Math.min(duration, possibleDuration);
             }
 
             StringBuilder sb = new StringBuilder();
@@ -270,13 +271,20 @@ public class GCInspector implements NotificationListener, GCInspectorMXBean
                     break;
             }
 
-            String st = sb.toString();
-            if (GC_WARN_THRESHOLD_IN_MS != 0 && duration > GC_WARN_THRESHOLD_IN_MS)
-                logger.warn(st);
-            else if (duration > MIN_LOG_DURATION)
-                logger.info(st);
-            else if (logger.isTraceEnabled())
-                logger.trace(st);
+//            String st = sb.toString();
+//            if (GC_WARN_THRESHOLD_IN_MS != 0 && duration > GC_WARN_THRESHOLD_IN_MS)
+//                logger.warn(st);
+//            else if (duration > MIN_LOG_DURATION)
+//                logger.info(st);
+//            else if (logger.isTraceEnabled())
+//                logger.trace(st);
+            if (duration > 0) {
+                logger.info("GC info: GcAction {}, GcCause {}, GcName {}", info.getGcAction(), info.getGcCause(), info.getGcName());
+                logger.info("Blocked for {} s, Total {}", duration / 1000d, gcInfo.getDuration() / 1000d);
+                if (duration < gcInfo.getDuration()) {
+                    logger.info("Smaller for {} ms", gcInfo.getDuration() - duration);
+                }
+            }
 
         }
     }

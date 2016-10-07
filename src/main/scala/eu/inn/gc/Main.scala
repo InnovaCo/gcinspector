@@ -5,6 +5,7 @@ import java.lang.management.ManagementFactory
 import java.util
 import java.util.concurrent.{Executors, ScheduledThreadPoolExecutor, TimeUnit}
 import scala.concurrent.ExecutionContext
+import scala.util.Random
 
 object Main extends App {
 
@@ -12,22 +13,22 @@ object Main extends App {
   @volatile
   private var sink: Object = _
 
-  val scheduler = Executors.newScheduledThreadPool(1)
-  scheduler.scheduleAtFixedRate(
-    new Runnable {
-      override def run(): Unit = {
-        ManagementFactory.getGarbageCollectorMXBeans foreach { gc ⇒
-          //    stats.newGauge(s"gc.${gc.getName.replaceAll("[^\\w]+", "-")}.count")(gc.getCollectionCount)
-          //    stats.newGauge(s"gc.${gc.getName.replaceAll("[^\\w]+", "-")}.time")(gc.getCollectionTime)
-          println(s"gc.${gc.getName.replaceAll("[^\\w]+", "-")}.count", gc.getCollectionCount)
-          println(s"gc.${gc.getName.replaceAll("[^\\w]+", "-")}.time", gc.getCollectionTime)
-        }
-      }
-    },
-    0,
-    1,
-    TimeUnit.SECONDS
-  )
+//  val scheduler = Executors.newScheduledThreadPool(1)
+//  scheduler.scheduleAtFixedRate(
+//    new Runnable {
+//      override def run(): Unit = {
+//        ManagementFactory.getGarbageCollectorMXBeans foreach { gc ⇒
+//          //    stats.newGauge(s"gc.${gc.getName.replaceAll("[^\\w]+", "-")}.count")(gc.getCollectionCount)
+//          //    stats.newGauge(s"gc.${gc.getName.replaceAll("[^\\w]+", "-")}.time")(gc.getCollectionTime)
+//          println(s"gc.${gc.getName.replaceAll("[^\\w]+", "-")}.count", gc.getCollectionCount)
+//          println(s"gc.${gc.getName.replaceAll("[^\\w]+", "-")}.time", gc.getCollectionTime)
+//        }
+//      }
+//    },
+//    0,
+//    1,
+//    TimeUnit.SECONDS
+//  )
 
   GCInspector.register()
 
@@ -35,6 +36,9 @@ object Main extends App {
     try {
       leak.add(new Array[Byte](1024 * 1024))
       sink = new Array[Byte](1024 * 1024)
+      if (Random.nextInt(10) == 5) {
+        Thread.sleep(1000)
+      }
     } catch {
       case _: OutOfMemoryError ⇒
         leak.clear()
