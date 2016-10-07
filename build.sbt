@@ -52,3 +52,8 @@ val params = Seq(
 packJvmOpts := Map("main" -> params)
 
 packJarNameConvention := "full"
+
+libraryDependencies ++= Seq(
+  "ch.qos.logback" % "logback-classic" % "1.1.2",
+  "com.typesafe.scala-logging" %% "scala-logging" % "3.1.0"
+)
