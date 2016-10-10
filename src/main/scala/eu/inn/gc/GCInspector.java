@@ -43,34 +43,6 @@ public class GCInspector implements NotificationListener, GCInspectorMXBean
     private static final Logger logger = LoggerFactory.getLogger(GCInspector.class);
 
 
-    static final class GCState
-    {
-        final GarbageCollectorMXBean gcBean;
-        final boolean assumeGCIsPartiallyConcurrent;
-        final boolean assumeGCIsOldGen;
-        private String[] keys;
-        long lastGcTotalDuration = 0;
-
-
-        GCState(GarbageCollectorMXBean gcBean, boolean assumeGCIsPartiallyConcurrent, boolean assumeGCIsOldGen)
-        {
-            this.gcBean = gcBean;
-            this.assumeGCIsPartiallyConcurrent = assumeGCIsPartiallyConcurrent;
-            this.assumeGCIsOldGen = assumeGCIsOldGen;
-        }
-
-        String[] keys(GarbageCollectionNotificationInfo info)
-        {
-            if (keys != null)
-                return keys;
-
-            keys = info.getGcInfo().getMemoryUsageBeforeGc().keySet().toArray(new String[0]);
-            Arrays.sort(keys);
-
-            return keys;
-        }
-    }
-
     final AtomicReference<State> state = new AtomicReference<>(new State());
 
     final Map<String, GCState> gcStates = new HashMap<>();
@@ -183,11 +155,11 @@ public class GCInspector implements NotificationListener, GCInspectorMXBean
              * value by asking for and tracking cumulative time spent blocked in GC.
              */
             GCState gcState = gcStates.get(gcName);
-            if (gcState.assumeGCIsPartiallyConcurrent)
+            if (gcState.assumeGCIsPartiallyConcurrent())
             {
-                long previousTotal = gcState.lastGcTotalDuration;
-                long total = gcState.gcBean.getCollectionTime();
-                gcState.lastGcTotalDuration = total;
+                long previousTotal = gcState.lastGcTotalDuration();
+                long total = gcState.gcBean().getCollectionTime();
+                gcState.lastGcTotalDuration_$eq(total);
                 long possibleDuration = total - previousTotal; // may be zero for a really fast collection
                 duration = Math.min(duration, possibleDuration);
             }
@@ -206,7 +178,7 @@ public class GCInspector implements NotificationListener, GCInspectorMXBean
                     sb.append(key).append(": ").append(before.getUsed());
                     sb.append(" -> ");
                     sb.append(after.getUsed());
-                    if (!key.equals(gcState.keys[gcState.keys.length - 1]))
+                    if (!key.equals(gcState.keys()[gcState.keys().length - 1]))
                         sb.append("; ");
                     bytes += before.getUsed() - after.getUsed();
                 }
