@@ -34,7 +34,6 @@ object GCState {
          "PS MarkSweep" |
          "PS Scavenge" |
          "G1 Young Generation" |
-          //CMS young generation collector
           "ParNew" ⇒ false
     case "ConcurrentMarkSweep" | "G1 Old Generation" ⇒ true
 

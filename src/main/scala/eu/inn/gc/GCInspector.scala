@@ -61,9 +61,7 @@ class GCInspector extends NotificationListener with GCInspectorMXBean {
   }
 
   def handleNotification(notification: Notification, handback: Any): Unit = {
-    if (notification.getType == GarbageCollectionNotificationInfo.GARBAGE_COLLECTION_NOTIFICATION) {
-      val cd = notification.getUserData.asInstanceOf[CompositeData]
-      val gcNotification: GarbageCollectionNotificationInfo = GarbageCollectionNotificationInfo.from(cd)
+    convertToGcNotification(notification).foreach { gcNotification ⇒
       val gcName = gcNotification.getGcName
       val gcInfo: GcInfo = gcNotification.getGcInfo
 
@@ -85,6 +83,13 @@ class GCInspector extends NotificationListener with GCInspectorMXBean {
     }
   }
 
+  private def convertToGcNotification(notification: Notification): Option[GarbageCollectionNotificationInfo] = notification.getType match {
+    case GarbageCollectionNotificationInfo.GARBAGE_COLLECTION_NOTIFICATION ⇒
+      val cd = notification.getUserData.asInstanceOf[CompositeData]
+      Some(GarbageCollectionNotificationInfo.from(cd))
+    case _ ⇒ None
+  }
+
   /*
    * The duration supplied in the notification gcNotification includes more than just
    * application stopped time for concurrent GCs. Try and do a better job coming up with a good stopped time
@@ -92,9 +97,9 @@ class GCInspector extends NotificationListener with GCInspectorMXBean {
    */
   private def calculateDuration(gcInfo: GcInfo, gcState: GCState): Long = {
     if (gcState.assumeGCIsPartiallyConcurrent) {
-      val previousTotal: Long = gcState.lastGcTotalDuration
-      val total: Long = gcState.gcBean.getCollectionTime
-      gcState.lastGcTotalDuration_$eq(total)
+      val previousTotal = gcState.lastGcTotalDuration
+      val total = gcState.gcBean.getCollectionTime
+      gcState.lastGcTotalDuration = total
       val possibleDuration: Long = total - previousTotal // may be zero for a really fast collection
       Math.min(gcInfo.getDuration, possibleDuration)
     } else {
