@@ -35,16 +35,13 @@ package eu.inn.gc
 
 import com.sun.management.{GarbageCollectionNotificationInfo, GcInfo}
 import java.lang.management.{GarbageCollectorMXBean, ManagementFactory, MemoryUsage}
-import java.util.concurrent.atomic.AtomicReference
-import javax.management.{Notification, NotificationListener, ObjectName}
 import javax.management.openmbean.CompositeData
+import javax.management.{Notification, NotificationListener, ObjectName}
 import org.slf4j.{Logger, LoggerFactory}
-import scala.annotation.tailrec
 import scala.collection.JavaConversions._
 
 class GCInspector extends NotificationListener with GCInspectorMXBean {
 
-  private val state = new AtomicReference[State](new State)
   private val gcStates = new scala.collection.mutable.HashMap[String, GCState]
 
   private val mbs = ManagementFactory.getPlatformMBeanServer
@@ -70,8 +67,6 @@ class GCInspector extends NotificationListener with GCInspectorMXBean {
       val duration = calculateDuration(gcInfo, gcState)
 
       val bytes = calculateBytes(gcInfo, gcState, gcNotification)
-
-      updateState(duration, bytes)
 
       if (duration > 0) {
         GCInspector.logger.info("GC gcNotification: GcAction {}, GcCause {}, GcName {}", gcNotification.getGcAction, gcNotification.getGcCause, gcNotification.getGcName)
@@ -118,14 +113,6 @@ class GCInspector extends NotificationListener with GCInspectorMXBean {
       } else {
         bytes
       }
-    }
-  }
-
-  @tailrec
-  private def updateState(extraElapsed: Double, extraBytes: Double): Unit = {
-    val prev = state.get
-    if (!state.compareAndSet(prev, new State(extraElapsed, extraBytes, prev))) {
-      updateState(extraElapsed, extraBytes)
     }
   }
 }
