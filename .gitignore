@@ -21,3 +21,6 @@ project/plugins/project/
 .project
 .settings
 .cache
+
+# project specific
+gc.log*

@@ -10,9 +10,9 @@ class GCState(val gcBean: GarbageCollectorMXBean) {
 
   val assumeGCIsPartiallyConcurrent = GCState.assumeGCIsPartiallyConcurrent(gcBean)
 
-  def keys(info: GarbageCollectionNotificationInfo): Array[String] = {
+  def keys(gcNotification: GarbageCollectionNotificationInfo): Array[String] = {
     if (keys != null) return keys
-    keys = info.getGcInfo.getMemoryUsageBeforeGc.keySet.toArray(new Array[String](0)).sorted
+    keys = gcNotification.getGcInfo.getMemoryUsageBeforeGc.keySet.toArray(new Array[String](0)).sorted
     keys
   }
 }

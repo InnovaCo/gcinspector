@@ -33,84 +33,85 @@
  */
 package eu.inn.gc
 
-import com.sun.management.GarbageCollectionNotificationInfo
-import com.sun.management.GcInfo
-import org.slf4j.Logger
-import org.slf4j.LoggerFactory
-import javax.management.MBeanServer
-import javax.management.Notification
-import javax.management.NotificationListener
-import javax.management.ObjectName
-import javax.management.openmbean.CompositeData
-import java.lang.management.GarbageCollectorMXBean
-import java.lang.management.ManagementFactory
-import java.lang.management.MemoryUsage
-import java.util.HashMap
-import java.util.Map
+import com.sun.management.{GarbageCollectionNotificationInfo, GcInfo}
+import java.lang.management.{GarbageCollectorMXBean, ManagementFactory, MemoryUsage}
 import java.util.concurrent.atomic.AtomicReference
+import javax.management.{Notification, NotificationListener, ObjectName}
+import javax.management.openmbean.CompositeData
+import org.slf4j.{Logger, LoggerFactory}
 import scala.annotation.tailrec
+import scala.collection.JavaConversions._
 
-class GCInspector() extends NotificationListener with GCInspectorMXBean {
+class GCInspector extends NotificationListener with GCInspectorMXBean {
 
-  val mbs: MBeanServer = ManagementFactory.getPlatformMBeanServer
+  private val state = new AtomicReference[State](new State)
+  private val gcStates = new scala.collection.mutable.HashMap[String, GCState]
+
+  private val mbs = ManagementFactory.getPlatformMBeanServer
+
   try {
     val gcName: ObjectName = new ObjectName(ManagementFactory.GARBAGE_COLLECTOR_MXBEAN_DOMAIN_TYPE + ",*")
-    import scala.collection.JavaConversions._
-    for (name <- mbs.queryNames(gcName, null)) {
-      val gc: GarbageCollectorMXBean = ManagementFactory.newPlatformMXBeanProxy(mbs, name.getCanonicalName, classOf[GarbageCollectorMXBean])
-      gcStates.put(gc.getName, new GCState(gc))
+    mbs.queryNames(gcName, null).foreach { name ⇒
+      val gc = ManagementFactory.newPlatformMXBeanProxy(mbs, name.getCanonicalName, classOf[GarbageCollectorMXBean])
+      gcStates(gc.getName) = new GCState(gc)
     }
     mbs.registerMBean(this, new ObjectName(GCInspector.MBEAN_NAME))
-  }
-  catch {
-    case e: Exception ⇒ {
-      throw new RuntimeException(e)
-    }
+  } catch {
+    case e: Exception ⇒ throw new RuntimeException(e)
   }
 
-  final private[gc] val state: AtomicReference[State] = new AtomicReference[State](new State)
-  final private[gc] val gcStates: Map[String, GCState] = new HashMap[String, GCState]
+  def handleNotification(notification: Notification, handback: Any): Unit = {
+    if (notification.getType == GarbageCollectionNotificationInfo.GARBAGE_COLLECTION_NOTIFICATION) {
+      val cd = notification.getUserData.asInstanceOf[CompositeData]
+      val gcNotification: GarbageCollectionNotificationInfo = GarbageCollectionNotificationInfo.from(cd)
+      val gcName = gcNotification.getGcName
+      val gcInfo: GcInfo = gcNotification.getGcInfo
 
-  def handleNotification(notification: Notification, handback: Any) {
-    val `type`: String = notification.getType
-    if (`type` == GarbageCollectionNotificationInfo.GARBAGE_COLLECTION_NOTIFICATION) {
-      // retrieve the garbage collection notification information
-      val cd: CompositeData = notification.getUserData.asInstanceOf[CompositeData]
-      val info: GarbageCollectionNotificationInfo = GarbageCollectionNotificationInfo.from(cd)
-      val gcName: String = info.getGcName
-      val gcInfo: GcInfo = info.getGcInfo
-      var duration: Long = gcInfo.getDuration
-      /*
-                   * The duration supplied in the notification info includes more than just
-                   * application stopped time for concurrent GCs. Try and do a better job coming up with a good stopped time
-                   * value by asking for and tracking cumulative time spent blocked in GC.
-                   */ val gcState: GCState = gcStates.get(gcName)
-      if (gcState.assumeGCIsPartiallyConcurrent) {
-        val previousTotal: Long = gcState.lastGcTotalDuration
-        val total: Long = gcState.gcBean.getCollectionTime
-        gcState.lastGcTotalDuration_$eq(total)
-        val possibleDuration: Long = total - previousTotal // may be zero for a really fast collection
-        duration = Math.min(duration, possibleDuration)
-      }
-      var bytes: Long = 0
-      val beforeMemoryUsage: Map[String, MemoryUsage] = gcInfo.getMemoryUsageBeforeGc
-      val afterMemoryUsage: Map[String, MemoryUsage] = gcInfo.getMemoryUsageAfterGc
-      for (key <- gcState.keys(info)) {
-        val before: MemoryUsage = beforeMemoryUsage.get(key)
-        val after: MemoryUsage = afterMemoryUsage.get(key)
-        if (after != null && after.getUsed != before.getUsed) {
-          bytes += before.getUsed - after.getUsed
-        }
-      }
+      val gcState = gcStates(gcName)
+
+      val duration = calculateDuration(gcInfo, gcState)
+
+      val bytes = calculateBytes(gcInfo, gcState, gcNotification)
 
       updateState(duration, bytes)
 
       if (duration > 0) {
-        GCInspector.logger.info("GC info: GcAction {}, GcCause {}, GcName {}", info.getGcAction, info.getGcCause, info.getGcName)
+        GCInspector.logger.info("GC gcNotification: GcAction {}, GcCause {}, GcName {}", gcNotification.getGcAction, gcNotification.getGcCause, gcNotification.getGcName)
         GCInspector.logger.info("Blocked for {} s, Total {}", duration / 1000d, gcInfo.getDuration / 1000d)
         if (duration < gcInfo.getDuration) {
           GCInspector.logger.info("Smaller for {} ms", gcInfo.getDuration - duration)
         }
+      }
+    }
+  }
+
+  /*
+   * The duration supplied in the notification gcNotification includes more than just
+   * application stopped time for concurrent GCs. Try and do a better job coming up with a good stopped time
+   * value by asking for and tracking cumulative time spent blocked in GC.
+   */
+  private def calculateDuration(gcInfo: GcInfo, gcState: GCState): Long = {
+    if (gcState.assumeGCIsPartiallyConcurrent) {
+      val previousTotal: Long = gcState.lastGcTotalDuration
+      val total: Long = gcState.gcBean.getCollectionTime
+      gcState.lastGcTotalDuration_$eq(total)
+      val possibleDuration: Long = total - previousTotal // may be zero for a really fast collection
+      Math.min(gcInfo.getDuration, possibleDuration)
+    } else {
+      gcInfo.getDuration
+    }
+  }
+
+  private def calculateBytes(gcInfo: GcInfo, gcState: GCState, gcNotification: GarbageCollectionNotificationInfo): Long = {
+    val beforeMemoryUsage = gcInfo.getMemoryUsageBeforeGc
+    val afterMemoryUsage = gcInfo.getMemoryUsageAfterGc
+    gcState.keys(gcNotification).foldLeft(0L) { (bytes, key) ⇒
+      val before: MemoryUsage = beforeMemoryUsage.get(key)
+      val after: MemoryUsage = afterMemoryUsage.get(key)
+      if (after != null && after.getUsed != before.getUsed) {
+        bytes + (before.getUsed - after.getUsed)
+      } else {
+        bytes
       }
     }
   }
@@ -132,11 +133,10 @@ object GCInspector {
 
   @throws[Exception]
   def register() {
-    val inspector: GCInspector = new GCInspector
-    val server: MBeanServer = ManagementFactory.getPlatformMBeanServer
-    val gcName: ObjectName = new ObjectName(ManagementFactory.GARBAGE_COLLECTOR_MXBEAN_DOMAIN_TYPE + ",*")
-    import scala.collection.JavaConversions._
-    for (name <- server.queryNames(gcName, null)) {
+    val inspector = new GCInspector
+    val server = ManagementFactory.getPlatformMBeanServer
+    val gcName = new ObjectName(ManagementFactory.GARBAGE_COLLECTOR_MXBEAN_DOMAIN_TYPE + ",*")
+    server.queryNames(gcName, null).foreach { name ⇒
       server.addNotificationListener(name, inspector, null, null)
     }
   }
