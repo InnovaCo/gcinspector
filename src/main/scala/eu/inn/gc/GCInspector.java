@@ -57,7 +57,7 @@ public class GCInspector implements NotificationListener, GCInspectorMXBean
             for (ObjectName name : mbs.queryNames(gcName, null))
             {
                 GarbageCollectorMXBean gc = ManagementFactory.newPlatformMXBeanProxy(mbs, name.getCanonicalName(), GarbageCollectorMXBean.class);
-                gcStates.put(gc.getName(), new GCState(gc, assumeGCIsPartiallyConcurrent(gc), assumeGCIsOldGen(gc)));
+                gcStates.put(gc.getName(), new GCState(gc));
             }
 
             mbs.registerMBean(this, new ObjectName(MBEAN_NAME));
@@ -76,63 +76,6 @@ public class GCInspector implements NotificationListener, GCInspectorMXBean
         for (ObjectName name : server.queryNames(gcName, null))
         {
             server.addNotificationListener(name, inspector, null, null);
-        }
-    }
-
-    /*
-     * Assume that a GC type is at least partially concurrent and so a side channel method
-     * should be used to calculate application stopped time due to the GC.
-     *
-     * If the GC isn't recognized then assume that is concurrent and we need to do our own calculation
-     * via the the side channel.
-     */
-    private static boolean assumeGCIsPartiallyConcurrent(GarbageCollectorMXBean gc)
-    {
-        switch (gc.getName())
-        {
-                //First two are from the serial collector
-            case "Copy":
-            case "MarkSweepCompact":
-                //Parallel collector
-            case "PS MarkSweep":
-            case "PS Scavenge":
-            case "G1 Young Generation":
-                //CMS young generation collector
-            case "ParNew":
-                return false;
-            case "ConcurrentMarkSweep":
-            case "G1 Old Generation":
-                return true;
-            default:
-                //Assume possibly concurrent if unsure
-                return true;
-        }
-    }
-
-    /*
-     * Assume that a GC type is an old generation collection so TransactionLogs.rescheduleFailedTasks()
-     * should be invoked.
-     *
-     * Defaults to not invoking TransactionLogs.rescheduleFailedTasks() on unrecognized GC names
-     */
-    private static boolean assumeGCIsOldGen(GarbageCollectorMXBean gc)
-    {
-        switch (gc.getName())
-        {
-            case "Copy":
-            case "PS Scavenge":
-            case "G1 Young Generation":
-            case "ParNew":
-                return false;
-            case "MarkSweepCompact":
-            case "PS MarkSweep":
-            case "ConcurrentMarkSweep":
-            case "G1 Old Generation":
-                return true;
-            default:
-                //Assume not old gen otherwise, don't call
-                //TransactionLogs.rescheduleFailedTasks()
-                return false;
         }
     }
 
