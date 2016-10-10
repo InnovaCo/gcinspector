@@ -69,31 +69,6 @@ public class GCInspector implements NotificationListener, GCInspectorMXBean
         BITS_TOTAL_CAPACITY = temp;
     }
 
-    static final class State
-    {
-        final double maxRealTimeElapsed;
-        final double totalRealTimeElapsed;
-        final double sumSquaresRealTimeElapsed;
-        final double totalBytesReclaimed;
-        final double count;
-        final long startNanos;
-
-        State(double extraElapsed, double extraBytes, State prev)
-        {
-            this.totalRealTimeElapsed = prev.totalRealTimeElapsed + extraElapsed;
-            this.totalBytesReclaimed = prev.totalBytesReclaimed + extraBytes;
-            this.sumSquaresRealTimeElapsed = prev.sumSquaresRealTimeElapsed + (extraElapsed * extraElapsed);
-            this.startNanos = prev.startNanos;
-            this.count = prev.count + 1;
-            this.maxRealTimeElapsed = Math.max(prev.maxRealTimeElapsed, extraElapsed);
-        }
-
-        State()
-        {
-            count = maxRealTimeElapsed = sumSquaresRealTimeElapsed = totalRealTimeElapsed = totalBytesReclaimed = 0;
-            startNanos = System.nanoTime();
-        }
-    }
 
     static final class GCState
     {
@@ -298,12 +273,12 @@ public class GCInspector implements NotificationListener, GCInspectorMXBean
     {
         State state = getTotalSinceLastCheck();
         double[] r = new double[7];
-        r[0] = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - state.startNanos);
-        r[1] = state.maxRealTimeElapsed;
-        r[2] = state.totalRealTimeElapsed;
-        r[3] = state.sumSquaresRealTimeElapsed;
-        r[4] = state.totalBytesReclaimed;
-        r[5] = state.count;
+        r[0] = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - state.startNanos());
+        r[1] = state.maxRealTimeElapsed();
+        r[2] = state.totalRealTimeElapsed();
+        r[3] = state.sumSquaresRealTimeElapsed();
+        r[4] = state.totalBytesReclaimed();
+        r[5] = state.count();
         r[6] = getAllocatedDirectMemory();
 
         return r;
