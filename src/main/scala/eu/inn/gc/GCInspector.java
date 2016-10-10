@@ -41,33 +41,6 @@ public class GCInspector implements NotificationListener, GCInspectorMXBean
 {
     public static final String MBEAN_NAME = "eu.inn.gc:type=GCInspector";
     private static final Logger logger = LoggerFactory.getLogger(GCInspector.class);
-    final static long MIN_LOG_DURATION = 1;
-    final static long GC_WARN_THRESHOLD_IN_MS = 1000;
-    final static long STAT_THRESHOLD = GC_WARN_THRESHOLD_IN_MS != 0 ? GC_WARN_THRESHOLD_IN_MS : MIN_LOG_DURATION;
-
-    /*
-     * The field from java.nio.Bits that tracks the total number of allocated
-     * bytes of direct memory requires via ByteBuffer.allocateDirect that have not been GCed.
-     */
-    final static Field BITS_TOTAL_CAPACITY;
-
-    static
-    {
-        Field temp = null;
-        try
-        {
-            Class<?> bitsClass = Class.forName("java.nio.Bits");
-            Field f = bitsClass.getDeclaredField("totalCapacity");
-            f.setAccessible(true);
-            temp = f;
-        }
-        catch (Throwable t)
-        {
-            logger.debug("Error accessing field of java.nio.Bits", t);
-            //Don't care, will just return the dummy value -1 if we can't get at the field in this JVM
-        }
-        BITS_TOTAL_CAPACITY = temp;
-    }
 
 
     static final class GCState
@@ -246,13 +219,6 @@ public class GCInspector implements NotificationListener, GCInspectorMXBean
                     break;
             }
 
-//            String st = sb.toString();
-//            if (GC_WARN_THRESHOLD_IN_MS != 0 && duration > GC_WARN_THRESHOLD_IN_MS)
-//                logger.warn(st);
-//            else if (duration > MIN_LOG_DURATION)
-//                logger.info(st);
-//            else if (logger.isTraceEnabled())
-//                logger.trace(st);
             if (duration > 0) {
                 logger.info("GC info: GcAction {}, GcCause {}, GcName {}", info.getGcAction(), info.getGcCause(), info.getGcName());
                 logger.info("Blocked for {} s, Total {}", duration / 1000d, gcInfo.getDuration() / 1000d);
@@ -264,38 +230,4 @@ public class GCInspector implements NotificationListener, GCInspectorMXBean
         }
     }
 
-    public State getTotalSinceLastCheck()
-    {
-        return state.getAndSet(new State());
-    }
-
-    public double[] getAndResetStats()
-    {
-        State state = getTotalSinceLastCheck();
-        double[] r = new double[7];
-        r[0] = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - state.startNanos());
-        r[1] = state.maxRealTimeElapsed();
-        r[2] = state.totalRealTimeElapsed();
-        r[3] = state.sumSquaresRealTimeElapsed();
-        r[4] = state.totalBytesReclaimed();
-        r[5] = state.count();
-        r[6] = getAllocatedDirectMemory();
-
-        return r;
-    }
-
-    private static long getAllocatedDirectMemory()
-    {
-        if (BITS_TOTAL_CAPACITY == null) return -1;
-        try
-        {
-            return BITS_TOTAL_CAPACITY.getLong(null);
-        }
-        catch (Throwable t)
-        {
-            logger.trace("Error accessing field of java.nio.Bits", t);
-            //Don't care how or why we failed to get the value in this JVM. Return -1 to indicate failure
-            return -1;
-        }
-    }
 }
