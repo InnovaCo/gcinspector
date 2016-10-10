@@ -36,23 +36,19 @@ package eu.inn.gc
 import com.sun.management.{GarbageCollectionNotificationInfo, GcInfo}
 import java.lang.management.{GarbageCollectorMXBean, ManagementFactory, MemoryUsage}
 import javax.management.openmbean.CompositeData
-import javax.management.{Notification, NotificationListener, ObjectName}
-import org.slf4j.{Logger, LoggerFactory}
+import javax.management.{MBeanServer, Notification, NotificationListener, ObjectName}
+import org.slf4j.LoggerFactory
 import scala.collection.JavaConversions._
 
-class GCInspector() extends NotificationListener with GCInspectorMXBean {
-
-  private val mbs = ManagementFactory.getPlatformMBeanServer
+class GCInspector(beanServer: MBeanServer) extends NotificationListener with GCInspectorMXBean {
 
   private val gcStates: Map[String, GCState] = {
     val gcName = new ObjectName(ManagementFactory.GARBAGE_COLLECTOR_MXBEAN_DOMAIN_TYPE + ",*")
-    mbs.queryNames(gcName, null).map { name ⇒
-      val gc = ManagementFactory.newPlatformMXBeanProxy(mbs, name.getCanonicalName, classOf[GarbageCollectorMXBean])
+    beanServer.queryNames(gcName, null).map { name ⇒
+      val gc = ManagementFactory.newPlatformMXBeanProxy(beanServer, name.getCanonicalName, classOf[GarbageCollectorMXBean])
       gc.getName → new GCState(gc)
     }.toMap
   }
-
-  mbs.registerMBean(this, new ObjectName(GCInspector.MBEAN_NAME))
 
   def handleNotification(notification: Notification, handback: Any): Unit = {
     convertToGcNotification(notification).foreach { gcNotification ⇒
@@ -118,13 +114,14 @@ class GCInspector() extends NotificationListener with GCInspectorMXBean {
 
 object GCInspector {
 
-  val MBEAN_NAME: String = "eu.inn.gc:type=GCInspector"
-  val logger: Logger = LoggerFactory.getLogger(classOf[GCInspector])
+  private val MbeanName = "eu.inn.gc:type=GCInspector"
+  val logger = LoggerFactory.getLogger(classOf[GCInspector])
 
   @throws[Exception]
   def register() {
-    val inspector = new GCInspector
     val server = ManagementFactory.getPlatformMBeanServer
+    val inspector = new GCInspector(server)
+    server.registerMBean(inspector, new ObjectName(GCInspector.MbeanName))
     val gcName = new ObjectName(ManagementFactory.GARBAGE_COLLECTOR_MXBEAN_DOMAIN_TYPE + ",*")
     server.queryNames(gcName, null).foreach { name ⇒
       server.addNotificationListener(name, inspector, null, null)
