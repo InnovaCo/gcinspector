@@ -40,22 +40,19 @@ import javax.management.{Notification, NotificationListener, ObjectName}
 import org.slf4j.{Logger, LoggerFactory}
 import scala.collection.JavaConversions._
 
-class GCInspector extends NotificationListener with GCInspectorMXBean {
-
-  private val gcStates = new scala.collection.mutable.HashMap[String, GCState]
+class GCInspector() extends NotificationListener with GCInspectorMXBean {
 
   private val mbs = ManagementFactory.getPlatformMBeanServer
 
-  try {
-    val gcName: ObjectName = new ObjectName(ManagementFactory.GARBAGE_COLLECTOR_MXBEAN_DOMAIN_TYPE + ",*")
-    mbs.queryNames(gcName, null).foreach { name ⇒
+  private val gcStates: Map[String, GCState] = {
+    val gcName = new ObjectName(ManagementFactory.GARBAGE_COLLECTOR_MXBEAN_DOMAIN_TYPE + ",*")
+    mbs.queryNames(gcName, null).map { name ⇒
       val gc = ManagementFactory.newPlatformMXBeanProxy(mbs, name.getCanonicalName, classOf[GarbageCollectorMXBean])
-      gcStates(gc.getName) = new GCState(gc)
-    }
-    mbs.registerMBean(this, new ObjectName(GCInspector.MBEAN_NAME))
-  } catch {
-    case e: Exception ⇒ throw new RuntimeException(e)
+      gc.getName → new GCState(gc)
+    }.toMap
   }
+
+  mbs.registerMBean(this, new ObjectName(GCInspector.MBEAN_NAME))
 
   def handleNotification(notification: Notification, handback: Any): Unit = {
     convertToGcNotification(notification).foreach { gcNotification ⇒
@@ -105,6 +102,7 @@ class GCInspector extends NotificationListener with GCInspectorMXBean {
   private def calculateBytes(gcInfo: GcInfo, gcState: GCState, gcNotification: GarbageCollectionNotificationInfo): Long = {
     val beforeMemoryUsage = gcInfo.getMemoryUsageBeforeGc
     val afterMemoryUsage = gcInfo.getMemoryUsageAfterGc
+
     gcState.keys(gcNotification).foldLeft(0L) { (bytes, key) ⇒
       val before: MemoryUsage = beforeMemoryUsage.get(key)
       val after: MemoryUsage = afterMemoryUsage.get(key)
