@@ -30,11 +30,8 @@ import javax.management.openmbean.CompositeData;
 import java.lang.management.GarbageCollectorMXBean;
 import java.lang.management.ManagementFactory;
 import java.lang.management.MemoryUsage;
-import java.lang.reflect.Field;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
 public class GCInspector implements NotificationListener, GCInspectorMXBean
@@ -107,8 +104,6 @@ public class GCInspector implements NotificationListener, GCInspectorMXBean
                 duration = Math.min(duration, possibleDuration);
             }
 
-            StringBuilder sb = new StringBuilder();
-            sb.append(info.getGcName()).append(" GC in ").append(duration).append("ms.  ");
             long bytes = 0;
             Map<String, MemoryUsage> beforeMemoryUsage = gcInfo.getMemoryUsageBeforeGc();
             Map<String, MemoryUsage> afterMemoryUsage = gcInfo.getMemoryUsageAfterGc();
@@ -118,11 +113,6 @@ public class GCInspector implements NotificationListener, GCInspectorMXBean
                 MemoryUsage after = afterMemoryUsage.get(key);
                 if (after != null && after.getUsed() != before.getUsed())
                 {
-                    sb.append(key).append(": ").append(before.getUsed());
-                    sb.append(" -> ");
-                    sb.append(after.getUsed());
-                    if (!key.equals(gcState.keys()[gcState.keys().length - 1]))
-                        sb.append("; ");
                     bytes += before.getUsed() - after.getUsed();
                 }
             }

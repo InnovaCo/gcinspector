@@ -32,6 +32,7 @@ packMain := Map("main" -> "eu.inn.gc.Main")
 val params = Seq(
   "-Xms128m",
   "-Xmx128m",
+//  "-XX:+UseG1GC",
   "-XX:+UseConcMarkSweepGC",
   "-XX:+UseParNewGC",
   "-XX:+UseGCLogFileRotation",
