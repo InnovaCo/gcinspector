@@ -1,22 +1,13 @@
 package eu.inn.gc
 
-import com.sun.management.GarbageCollectionNotificationInfo
 import java.lang.management.GarbageCollectorMXBean
 
 class GCState(val gcBean: GarbageCollectorMXBean) {
-
-  var keys: Array[String] = null
 
   @volatile
   var lastGcTotalDuration: Long = 0
 
   val assumeGCIsPartiallyConcurrent = GCState.assumeGCIsPartiallyConcurrent(gcBean)
-
-  def keys(gcNotification: GarbageCollectionNotificationInfo): Array[String] = {
-    if (keys != null) return keys
-    keys = gcNotification.getGcInfo.getMemoryUsageBeforeGc.keySet.toArray(new Array[String](0)).sorted
-    keys
-  }
 }
 
 object GCState {

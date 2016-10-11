@@ -59,7 +59,7 @@ class GCInspector(beanServer: MBeanServer) extends NotificationListener with GCI
 
       val duration = calculateDuration(gcInfo, gcState)
 
-      val bytes = calculateBytes(gcInfo, gcState, gcNotification)
+      val bytes = calculateBytes(gcInfo, gcState)
 
       if (duration > 0) {
         GCInspector.logger.info("GC gcNotification: GcAction {}, GcCause {}, GcName {}", gcNotification.getGcAction, gcNotification.getGcCause, gcNotification.getGcName)
@@ -95,19 +95,23 @@ class GCInspector(beanServer: MBeanServer) extends NotificationListener with GCI
     }
   }
 
-  private def calculateBytes(gcInfo: GcInfo, gcState: GCState, gcNotification: GarbageCollectionNotificationInfo): Long = {
+  private def calculateBytes(gcInfo: GcInfo, gcState: GCState): Long = {
     val beforeMemoryUsage = gcInfo.getMemoryUsageBeforeGc
     val afterMemoryUsage = gcInfo.getMemoryUsageAfterGc
 
-    gcState.keys(gcNotification).foldLeft(0L) { (bytes, key) ⇒
-      val before: MemoryUsage = beforeMemoryUsage.get(key)
-      val after: MemoryUsage = afterMemoryUsage.get(key)
+    gcPoolNames(gcInfo).foldLeft(0L) { (bytes, poolName) ⇒
+      val before: MemoryUsage = beforeMemoryUsage.get(poolName)
+      val after: MemoryUsage = afterMemoryUsage.get(poolName)
       if (after != null && after.getUsed != before.getUsed) {
         bytes + (before.getUsed - after.getUsed)
       } else {
         bytes
       }
     }
+  }
+
+  private def gcPoolNames(gcInfo: GcInfo): Set[String] = {
+    gcInfo.getMemoryUsageBeforeGc.keySet().toSet
   }
 }
 
