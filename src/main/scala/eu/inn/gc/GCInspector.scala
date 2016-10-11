@@ -128,6 +128,7 @@ object GCInspector {
     server.registerMBean(inspector, new ObjectName(GCInspector.MbeanName))
     val gcName = new ObjectName(ManagementFactory.GARBAGE_COLLECTOR_MXBEAN_DOMAIN_TYPE + ",*")
     server.queryNames(gcName, null).foreach { name ⇒
+      logger.info("Add a notification listener for the {} garbage collector", name.getKeyProperty("name"))
       server.addNotificationListener(name, inspector, null, null)
     }
   }
