@@ -1,5 +1,6 @@
 package eu.inn.gc
 
+import java.lang.Long
 import scala.collection.JavaConversions._
 import java.lang.management.ManagementFactory
 import java.util
@@ -13,24 +14,11 @@ object Main extends App {
   @volatile
   private var sink: Object = _
 
-//  val scheduler = Executors.newScheduledThreadPool(1)
-//  scheduler.scheduleAtFixedRate(
-//    new Runnable {
-//      override def run(): Unit = {
-//        ManagementFactory.getGarbageCollectorMXBeans foreach { gc ⇒
-//          //    stats.newGauge(s"gc.${gc.getName.replaceAll("[^\\w]+", "-")}.count")(gc.getCollectionCount)
-//          //    stats.newGauge(s"gc.${gc.getName.replaceAll("[^\\w]+", "-")}.time")(gc.getCollectionTime)
-//          println(s"gc.${gc.getName.replaceAll("[^\\w]+", "-")}.count", gc.getCollectionCount)
-//          println(s"gc.${gc.getName.replaceAll("[^\\w]+", "-")}.time", gc.getCollectionTime)
-//        }
-//      }
-//    },
-//    0,
-//    1,
-//    TimeUnit.SECONDS
-//  )
-
-  GCInspector.register()
+  GCInspector.register(new GCListener {
+    override def handleNotification(gcNotification: GCNotification): Unit = {
+      println(gcNotification)
+    }
+  })
 
   while(true) {
     try {

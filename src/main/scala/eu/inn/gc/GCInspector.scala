@@ -34,13 +34,14 @@
 package eu.inn.gc
 
 import com.sun.management.{GarbageCollectionNotificationInfo, GcInfo}
+import com.typesafe.scalalogging.Logger
 import java.lang.management.{GarbageCollectorMXBean, ManagementFactory, MemoryUsage}
 import javax.management.openmbean.CompositeData
 import javax.management.{MBeanServer, Notification, NotificationListener, ObjectName}
 import org.slf4j.LoggerFactory
 import scala.collection.JavaConversions._
 
-class GCInspector(beanServer: MBeanServer) extends NotificationListener with GCInspectorMXBean {
+class GCInspector(beanServer: MBeanServer, listener: GCListener) extends NotificationListener with GCInspectorMXBean {
 
   private val gcStates: Map[String, GCState] = {
     val gcName = new ObjectName(ManagementFactory.GARBAGE_COLLECTOR_MXBEAN_DOMAIN_TYPE + ",*")
@@ -55,19 +56,9 @@ class GCInspector(beanServer: MBeanServer) extends NotificationListener with GCI
       val gcName = gcNotification.getGcName
       val gcInfo: GcInfo = gcNotification.getGcInfo
 
-      val gcState = gcStates(gcName)
+      val stwPauseDuration = calculateStwPauseDuration(gcName, gcInfo)
 
-      val duration = calculateDuration(gcInfo, gcState)
-
-      val bytes = calculateBytes(gcInfo, gcState)
-
-      if (duration > 0) {
-        GCInspector.logger.info("GC gcNotification: GcAction {}, GcCause {}, GcName {}", gcNotification.getGcAction, gcNotification.getGcCause, gcNotification.getGcName)
-        GCInspector.logger.info("Blocked for {} s, Total {}", duration / 1000d, gcInfo.getDuration / 1000d)
-        if (duration < gcInfo.getDuration) {
-          GCInspector.logger.info("Smaller for {} ms", gcInfo.getDuration - duration)
-        }
-      }
+      listener.handleNotification(GCNotification(gcName, stwPauseDuration, gcInfo))
     }
   }
 
@@ -83,7 +74,8 @@ class GCInspector(beanServer: MBeanServer) extends NotificationListener with GCI
    * application stopped time for concurrent GCs. Try and do a better job coming up with a good stopped time
    * value by asking for and tracking cumulative time spent blocked in GC.
    */
-  private def calculateDuration(gcInfo: GcInfo, gcState: GCState): Long = {
+  private def calculateStwPauseDuration(gcName: String, gcInfo: GcInfo): Long = {
+    val gcState = gcStates(gcName)
     if (gcState.assumeGCIsPartiallyConcurrent) {
       val previousTotal = gcState.lastGcTotalDuration
       val total = gcState.gcBean.getCollectionTime
@@ -94,37 +86,18 @@ class GCInspector(beanServer: MBeanServer) extends NotificationListener with GCI
       gcInfo.getDuration
     }
   }
-
-  private def calculateBytes(gcInfo: GcInfo, gcState: GCState): Long = {
-    val beforeMemoryUsage = gcInfo.getMemoryUsageBeforeGc
-    val afterMemoryUsage = gcInfo.getMemoryUsageAfterGc
-
-    gcPoolNames(gcInfo).foldLeft(0L) { (bytes, poolName) ⇒
-      val before: MemoryUsage = beforeMemoryUsage.get(poolName)
-      val after: MemoryUsage = afterMemoryUsage.get(poolName)
-      if (after != null && after.getUsed != before.getUsed) {
-        bytes + (before.getUsed - after.getUsed)
-      } else {
-        bytes
-      }
-    }
-  }
-
-  private def gcPoolNames(gcInfo: GcInfo): Set[String] = {
-    gcInfo.getMemoryUsageBeforeGc.keySet().toSet
-  }
 }
 
 
 object GCInspector {
 
   private val MbeanName = "eu.inn.gc:type=GCInspector"
-  val logger = LoggerFactory.getLogger(classOf[GCInspector])
+  val logger = Logger(LoggerFactory.getLogger(classOf[GCInspector]))
 
   @throws[Exception]
-  def register() {
+  def register(listener: GCListener) {
     val server = ManagementFactory.getPlatformMBeanServer
-    val inspector = new GCInspector(server)
+    val inspector = new GCInspector(server, listener)
     server.registerMBean(inspector, new ObjectName(GCInspector.MbeanName))
     val gcName = new ObjectName(ManagementFactory.GARBAGE_COLLECTOR_MXBEAN_DOMAIN_TYPE + ",*")
     server.queryNames(gcName, null).foreach { name ⇒
