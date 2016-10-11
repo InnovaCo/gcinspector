@@ -46,8 +46,8 @@ class GCInspector(beanServer: MBeanServer, listener: GCListener) extends Notific
   private val gcStates: Map[String, GCState] = {
     val gcName = new ObjectName(ManagementFactory.GARBAGE_COLLECTOR_MXBEAN_DOMAIN_TYPE + ",*")
     beanServer.queryNames(gcName, null).map { name ⇒
-      val gc = ManagementFactory.newPlatformMXBeanProxy(beanServer, name.getCanonicalName, classOf[GarbageCollectorMXBean])
-      gc.getName → new GCState(gc)
+      val gcBean = ManagementFactory.newPlatformMXBeanProxy(beanServer, name.getCanonicalName, classOf[GarbageCollectorMXBean])
+      gcBean.getName → new GCState(gcBean)
     }.toMap
   }
 
@@ -58,7 +58,13 @@ class GCInspector(beanServer: MBeanServer, listener: GCListener) extends Notific
 
       val stwPauseDuration = calculateStwPauseDuration(gcName, gcInfo)
 
-      listener.handleNotification(GCNotification(gcName, stwPauseDuration, gcInfo))
+      listener.handleNotification(new GCNotification(
+        gcName = gcName,
+        gcAction = gcNotification.getGcAction,
+        gcCause = gcNotification.getGcCause,
+        stwPauseDuration = stwPauseDuration,
+        gcInfo = gcInfo
+      ))
     }
   }
 
@@ -78,9 +84,9 @@ class GCInspector(beanServer: MBeanServer, listener: GCListener) extends Notific
     val gcState = gcStates(gcName)
     if (gcState.assumeGCIsPartiallyConcurrent) {
       val previousTotal = gcState.lastGcTotalDuration
-      val total = gcState.gcBean.getCollectionTime
-      gcState.lastGcTotalDuration = total
-      val possibleDuration: Long = total - previousTotal // may be zero for a really fast collection
+      val currentTotal = gcState.gcBean.getCollectionTime
+      gcState.lastGcTotalDuration = currentTotal
+      val possibleDuration: Long = currentTotal - previousTotal // may be zero for a really fast collection
       Math.min(gcInfo.getDuration, possibleDuration)
     } else {
       gcInfo.getDuration
