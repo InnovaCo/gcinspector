@@ -1,11 +1,6 @@
 package eu.inn.gc
 
-import java.lang.Long
-import scala.collection.JavaConversions._
-import java.lang.management.ManagementFactory
 import java.util
-import java.util.concurrent.{Executors, ScheduledThreadPoolExecutor, TimeUnit}
-import scala.concurrent.ExecutionContext
 import scala.util.Random
 
 object Main extends App {
