@@ -6,6 +6,8 @@ import java.lang.management.GarbageCollectorMXBean
 class GCState(val gcBean: GarbageCollectorMXBean) {
 
   var keys: Array[String] = null
+
+  @volatile
   var lastGcTotalDuration: Long = 0
 
   val assumeGCIsPartiallyConcurrent = GCState.assumeGCIsPartiallyConcurrent(gcBean)
