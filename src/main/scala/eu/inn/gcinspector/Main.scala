@@ -1,4 +1,4 @@
-package eu.inn.gc
+package eu.inn.gcinspector
 
 import java.util
 import scala.util.Random

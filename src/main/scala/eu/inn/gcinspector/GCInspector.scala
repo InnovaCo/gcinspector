@@ -5,7 +5,7 @@
   * You could see the original source code in
   * https://git1-us-west.apache.org/repos/asf?p=cassandra.git;a=blob;f=src/java/org/apache/cassandra/service/GCInspector.java
   */
-package eu.inn.gc
+package eu.inn.gcinspector
 
 import com.sun.management.{GarbageCollectionNotificationInfo, GcInfo}
 import com.typesafe.scalalogging.Logger

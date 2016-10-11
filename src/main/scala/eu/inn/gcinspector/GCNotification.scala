@@ -1,4 +1,4 @@
-package eu.inn.gc
+package eu.inn.gcinspector
 
 import com.sun.management.GcInfo
 import java.lang.management.MemoryUsage

@@ -1,3 +1,3 @@
-package eu.inn.gc
+package eu.inn.gcinspector
 
 trait GCInspectorMXBean {}
