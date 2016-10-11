@@ -35,7 +35,7 @@ package eu.inn.gc
 
 import com.sun.management.{GarbageCollectionNotificationInfo, GcInfo}
 import com.typesafe.scalalogging.Logger
-import java.lang.management.{GarbageCollectorMXBean, ManagementFactory, MemoryUsage}
+import java.lang.management.{GarbageCollectorMXBean, ManagementFactory}
 import javax.management.openmbean.CompositeData
 import javax.management.{MBeanServer, Notification, NotificationListener, ObjectName}
 import org.slf4j.LoggerFactory
@@ -92,7 +92,7 @@ class GCInspector(beanServer: MBeanServer, listener: GCListener) extends Notific
 object GCInspector {
 
   private val MbeanName = "eu.inn.gc:type=GCInspector"
-  val logger = Logger(LoggerFactory.getLogger(classOf[GCInspector]))
+  private val logger = Logger(LoggerFactory.getLogger(classOf[GCInspector]))
 
   @throws[Exception]
   def register(listener: GCListener) {

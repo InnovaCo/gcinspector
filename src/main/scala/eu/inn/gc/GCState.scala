@@ -2,7 +2,7 @@ package eu.inn.gc
 
 import java.lang.management.GarbageCollectorMXBean
 
-class GCState(val gcBean: GarbageCollectorMXBean) {
+private class GCState(val gcBean: GarbageCollectorMXBean) {
 
   @volatile
   var lastGcTotalDuration: Long = 0
@@ -10,7 +10,7 @@ class GCState(val gcBean: GarbageCollectorMXBean) {
   val assumeGCIsPartiallyConcurrent = GCState.assumeGCIsPartiallyConcurrent(gcBean)
 }
 
-object GCState {
+private object GCState {
 
   /*
    * Assume that a GC type is at least partially concurrent and so a side channel method
