@@ -1,6 +1,6 @@
 organization := "eu.inn"
 
-name := "gc-info-experiment"
+name := "gcinspector"
 
 version := "0.1"
 
@@ -25,34 +25,9 @@ javacOptions ++= Seq(
   "-Xlint:deprecation"
 )
 
-packSettings
-
-packMain := Map("main" -> "eu.inn.gc.Main")
-
-val params = Seq(
-  "-Xms128m",
-  "-Xmx128m",
-//  "-XX:+UseG1GC",
-  "-XX:+UseConcMarkSweepGC",
-  "-XX:+UseParNewGC",
-  "-XX:+UseGCLogFileRotation",
-  "-XX:NumberOfGCLogFiles=10",
-  "-XX:GCLogFileSize=50M",
-  "-verbose:gc",
-  "-Xloggc:gc.log",
-  "-XX:+PrintGCDateStamps",
-//  "-XX:+PrintGCDetails",
-//  "-XX:+PrintHeapAtGC",
-//  "-XX:+PrintTenuringDistribution",
-  "-XX:+PrintGCApplicationStoppedTime"
-//  "-XX:+PrintPromotionFailure",
-//  "-XX:PrintFLSStatistics=1",
-//  "-XX:+PrintSafepointStatistics"
+resolvers ++= Seq(
+  Resolver.sonatypeRepo("public")
 )
-
-packJvmOpts := Map("main" -> params)
-
-packJarNameConvention := "full"
 
 libraryDependencies ++= Seq(
   "ch.qos.logback" % "logback-classic" % "1.1.2",
